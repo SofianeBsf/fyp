@@ -155,8 +155,15 @@ export async function semanticSearchViaAI(
     });
     return response.data;
   } catch (error) {
-    console.error("[AIService] Error in semantic search:", error);
-    throw new Error("Failed to perform semantic search via AI service");
+    console.warn("[AIService] Error in semantic search, returning empty results for fallback:", error.message);
+    // Return a structured empty response so the router can fall back gracefully
+    return {
+      results: [],
+      query,
+      query_embedding: [],
+      total_results: 0,
+      response_time_ms: 0
+    };
   }
 }
 

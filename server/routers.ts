@@ -211,67 +211,70 @@ export const appRouter = router({
             // Filter by minimum score
             results = results.filter(r => r.score_breakdown.final_score >= input.minScore);
             
-            // Transform results to match existing frontend format
-            const transformedResults = results.map(r => ({
-              product: {
-                id: r.product.id,
-                title: r.product.title,
-                description: r.product.description,
-                category: r.product.category,
-                imageUrl: products.find(p => p.id === r.product.id)?.imageUrl || null,
-                price: r.product.price?.toString() || null,
-                rating: r.product.rating?.toString() || null,
-                reviewCount: r.product.review_count || 0,
-                availability: (r.product.availability as "in_stock" | "low_stock" | "out_of_stock" | null) || "in_stock",
-              },
-              score: r.score_breakdown.final_score,
-              scoreBreakdown: {
-                semanticScore: r.score_breakdown.semantic_score,
-                ratingScore: r.score_breakdown.rating_score,
-                priceScore: r.score_breakdown.price_score,
-                stockScore: r.score_breakdown.stock_score,
-                recencyScore: r.score_breakdown.recency_score,
-              },
-              explanation: r.score_breakdown.explanation,
-              matchedTerms: r.score_breakdown.matched_terms,
-              rank: r.rank,
-            }));
-            
-            // Log search to database
-            const searchLogId = await logSearch({
-              query: input.query,
-              sessionId,
-              userId: ctx.user?.id || null,
-              resultsCount: transformedResults.length,
-              responseTimeMs: aiResult.response_time_ms,
-              aiServiceUsed: true,
-            });
-
-            // Save result explanations
-            if (searchLogId > 0) {
-              const explanations = transformedResults.map((r, i) => ({
-                searchLogId,
-                productId: r.product.id,
-                position: i + 1,
-                semanticScore: r.scoreBreakdown.semanticScore.toString(),
-                ratingScore: r.scoreBreakdown.ratingScore.toString(),
-                priceScore: r.scoreBreakdown.priceScore.toString(),
-                stockScore: r.scoreBreakdown.stockScore.toString(),
-                recencyScore: r.scoreBreakdown.recencyScore.toString(),
-                finalScore: r.score.toString(),
-                explanation: r.explanation,
-                matchedTerms: JSON.stringify(r.matchedTerms),
+            if (results.length > 0) {
+              // Transform results to match existing frontend format
+              const transformedResults = results.map(r => ({
+                product: {
+                  id: r.product.id,
+                  title: r.product.title,
+                  description: r.product.description,
+                  category: r.product.category,
+                  imageUrl: products.find(p => p.id === r.product.id)?.imageUrl || null,
+                  price: r.product.price?.toString() || null,
+                  rating: r.product.rating?.toString() || null,
+                  reviewCount: r.product.review_count || 0,
+                  availability: (r.product.availability as "in_stock" | "low_stock" | "out_of_stock" | null) || "in_stock",
+                },
+                score: r.score_breakdown.final_score,
+                scoreBreakdown: {
+                  semanticScore: r.score_breakdown.semantic_score,
+                  ratingScore: r.score_breakdown.rating_score,
+                  priceScore: r.score_breakdown.price_score,
+                  stockScore: r.score_breakdown.stock_score,
+                  recencyScore: r.score_breakdown.recency_score,
+                },
+                explanation: r.score_breakdown.explanation,
+                matchedTerms: r.score_breakdown.matched_terms,
+                rank: r.rank,
               }));
-              await saveSearchExplanations(explanations);
-            }
+              
+              // Log search to database
+              const searchLogId = await logSearch({
+                query: input.query,
+                sessionId,
+                userId: ctx.user?.id || null,
+                resultsCount: transformedResults.length,
+                responseTimeMs: aiResult.response_time_ms,
+                aiServiceUsed: true,
+              });
 
-            return {
-              results: transformedResults,
-              searchLogId,
-              responseTimeMs: aiResult.response_time_ms,
-              query: input.query,
-              aiServiceUsed: true,
-            };
+              // Save result explanations
+              if (searchLogId > 0) {
+                const explanations = transformedResults.map((r, i) => ({
+                  searchLogId,
+                  productId: r.product.id,
+                  position: i + 1,
+                  semanticScore: r.scoreBreakdown.semanticScore.toString(),
+                  ratingScore: r.scoreBreakdown.ratingScore.toString(),
+                  priceScore: r.scoreBreakdown.priceScore.toString(),
+                  stockScore: r.scoreBreakdown.stockScore.toString(),
+                  recencyScore: r.scoreBreakdown.recencyScore.toString(),
+                  finalScore: r.score.toString(),
+                  explanation: r.explanation,
+                  matchedTerms: JSON.stringify(r.matchedTerms),
+                }));
+                await saveSearchExplanations(explanations);
+              }
+
+              return {
+                results: transformedResults,
+                searchLogId,
+                responseTimeMs: aiResult.response_time_ms,
+                query: input.query,
+                aiServiceUsed: true,
+              };
+            }
+            console.log("[Search] AI service returned 0 results, falling back to local search");
           } catch (error) {
             console.warn("[Search] AI service error, falling back to local search:", error);
             // Fall through to local search
