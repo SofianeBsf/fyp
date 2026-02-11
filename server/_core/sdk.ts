@@ -10,6 +10,8 @@ import { ENV } from "./env";
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
+const isString = (value: unknown): value is string => typeof value === "string";
+
 export type SessionPayload = {
   openId: string;
   appId: string;
@@ -90,11 +92,7 @@ class SDKServer {
 
       const { openId, appId, name } = payload as Record<string, unknown>;
 
-      if (
-        !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
-      ) {
+      if (!isNonEmptyString(openId) || !isNonEmptyString(name) || !isString(appId)) {
         return null;
       }
 
