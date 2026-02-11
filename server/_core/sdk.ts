@@ -17,6 +17,8 @@ export type SessionPayload = {
 };
 
 class SDKServer {
+  private warnedAboutFallbackSecret = false;
+
   private parseCookies(cookieHeader: string | undefined) {
     if (!cookieHeader) return new Map<string, string>();
     const parsed = parseCookieHeader(cookieHeader);
@@ -25,10 +27,22 @@ class SDKServer {
 
   private getSessionSecret() {
     if (!ENV.cookieSecret) {
-      throw new Error(
-        "JWT_SECRET is missing. Set JWT_SECRET in your .env to enable sessions."
-      );
+      if (ENV.isProduction) {
+        throw new Error(
+          "JWT_SECRET is missing. Set JWT_SECRET in your .env to enable sessions."
+        );
+      }
+
+      if (!this.warnedAboutFallbackSecret) {
+        console.warn(
+          "[Auth] JWT_SECRET is missing. Using a local development fallback secret; sessions will reset when the server restarts."
+        );
+        this.warnedAboutFallbackSecret = true;
+      }
+
+      return new TextEncoder().encode("dev-only-fallback-jwt-secret");
     }
+
     return new TextEncoder().encode(ENV.cookieSecret);
   }
 
@@ -104,25 +118,42 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    const user = await db.getUserByOpenId(session.openId);
+    let user = await db.getUserByOpenId(session.openId);
+
+    // Local development convenience: bootstrap/update owner account as admin.
+    if (!user && !ENV.isProduction) {
+      await db.upsertUser({
+        openId: session.openId,
+        name: session.name,
+        loginMethod: "dev",
+        role: session.openId === ENV.ownerOpenId ? "admin" : "user",
+        lastSignedIn: new Date(),
+      });
+      user = await db.getUserByOpenId(session.openId);
+    }
+
     if (!user) {
       throw ForbiddenError("User not found");
     }
 
-    // Force admin role in development to ensure user has access
-    const userWithAdmin = {
-      ...user,
-      role: 'admin' as const
-    };
+    const shouldPromoteOwner = !ENV.isProduction && Boolean(ENV.ownerOpenId) && user.openId === ENV.ownerOpenId;
 
-    await db.upsertUser({
-      openId: user.openId,
-      role: 'admin',
-      lastSignedIn: new Date(),
-    });
+    if (shouldPromoteOwner && user.role !== "admin") {
+      await db.upsertUser({
+        openId: user.openId,
+        role: "admin",
+        lastSignedIn: new Date(),
+      });
 
-    return userWithAdmin;
+      return {
+        ...user,
+        role: "admin",
+      };
+    }
+
+    return user;
   }
+
 }
 
 export const sdk = new SDKServer();
