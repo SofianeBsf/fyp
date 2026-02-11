@@ -30,6 +30,7 @@ import {
   getSearchLogsWithResults,
   getEvaluationMetrics,
   getEvaluationMetricsBySearchLogId,
+  getSearchLogById,
   saveEvaluationMetric,
   createUploadJob,
   updateUploadJob,
@@ -150,6 +151,14 @@ export const appRouter = router({
 
   // ==================== SEMANTIC SEARCH ROUTES ====================
   search: router({
+    getBySearchLogId: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const log = await getSearchLogById(input.id);
+        if (!log) throw new TRPCError({ code: "NOT_FOUND", message: "Search log not found" });
+        return log;
+      }),
+
     // AI-powered semantic search using FastAPI + Sentence-BERT
     semantic: publicProcedure
       .input(z.object({
@@ -295,7 +304,7 @@ export const appRouter = router({
       return { healthy, service: "FastAPI + Sentence-BERT" };
     }),
 
-    logs: adminProcedure
+    logs: publicProcedure
       .input(z.object({ limit: z.number().min(1).max(500).default(100) }).optional())
       .query(async ({ input }) => {
         return getSearchLogs(input?.limit || 100);

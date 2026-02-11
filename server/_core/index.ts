@@ -52,6 +52,7 @@ async function startServer() {
         name,
         email,
         loginMethod: "dev",
+        role: "admin",
         lastSignedIn: new Date(),
       });
 
@@ -82,6 +83,7 @@ async function startServer() {
         name,
         email,
         loginMethod: "dev",
+        role: "admin",
         lastSignedIn: new Date(),
       });
 

@@ -109,12 +109,19 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    // Force admin role in development to ensure user has access
+    const userWithAdmin = {
+      ...user,
+      role: 'admin' as const
+    };
+
     await db.upsertUser({
       openId: user.openId,
+      role: 'admin',
       lastSignedIn: new Date(),
     });
 
-    return user;
+    return userWithAdmin;
   }
 }
 

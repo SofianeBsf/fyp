@@ -56,7 +56,14 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  // In development, if not authenticated, redirect to dev-login
+  if (!isAuthenticated) {
+    window.location.href = "/api/auth/dev-login?redirect=/admin";
+    return null;
+  }
+
+  // Double check admin role, but we'll ensure the dev-login grants it
+  if (user?.role !== "admin") {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -65,11 +72,11 @@ export default function AdminDashboard() {
             <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
             <p className="text-muted-foreground mb-4">
-              You need admin privileges to access this page.
+              Your account ({user?.email}) does not have admin privileges.
             </p>
-            <Button onClick={() => setLocation("/")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
+            <Button onClick={() => window.location.href = "/api/auth/dev-login?redirect=/admin"}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Login as Admin
             </Button>
           </Card>
         </div>

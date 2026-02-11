@@ -543,3 +543,11 @@ export async function getEvaluationMetricsBySearchLogId(searchLogId: number) {
     .where(eq(evaluationMetrics.notes, `SearchLogId: ${searchLogId}`))
     .orderBy(desc(evaluationMetrics.evaluatedAt));
 }
+
+export async function getSearchLogById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(searchLogs).where(eq(searchLogs.id, id)).limit(1);
+  return result[0];
+}
