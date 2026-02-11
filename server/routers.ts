@@ -29,6 +29,7 @@ import {
   getSearchLogs,
   getSearchLogsWithResults,
   getEvaluationMetrics,
+  getEvaluationMetricsBySearchLogId,
   saveEvaluationMetric,
   createUploadJob,
   updateUploadJob,
@@ -227,9 +228,37 @@ export const appRouter = router({
               rank: r.rank,
             }));
             
+            // Log search to database
+            const searchLogId = await logSearch({
+              query: input.query,
+              sessionId,
+              userId: ctx.user?.id || null,
+              resultsCount: transformedResults.length,
+              responseTimeMs: aiResult.response_time_ms,
+              aiServiceUsed: true,
+            });
+
+            // Save result explanations
+            if (searchLogId > 0) {
+              const explanations = transformedResults.map((r, i) => ({
+                searchLogId,
+                productId: r.product.id,
+                position: i + 1,
+                semanticScore: r.scoreBreakdown.semanticScore.toString(),
+                ratingScore: r.scoreBreakdown.ratingScore.toString(),
+                priceScore: r.scoreBreakdown.priceScore.toString(),
+                stockScore: r.scoreBreakdown.stockScore.toString(),
+                recencyScore: r.scoreBreakdown.recencyScore.toString(),
+                finalScore: r.score.toString(),
+                explanation: r.explanation,
+                matchedTerms: JSON.stringify(r.matchedTerms),
+              }));
+              await saveSearchExplanations(explanations);
+            }
+
             return {
               results: transformedResults,
-              searchLogId: null, // TODO: Log search to database
+              searchLogId,
               responseTimeMs: aiResult.response_time_ms,
               query: input.query,
               aiServiceUsed: true,
@@ -608,6 +637,12 @@ export const appRouter = router({
           return getEvaluationMetrics(input?.limit || 50);
         }),
 
+      bySearchLogId: adminProcedure
+        .input(z.object({ searchLogId: z.number() }))
+        .query(async ({ input }) => {
+          return getEvaluationMetricsBySearchLogId(input.searchLogId);
+        }),
+
       saveMetric: adminProcedure
         .input(z.object({
           metricType: z.enum(["ndcg@10", "recall@10", "precision@10", "mrr", "custom"]),
@@ -691,12 +726,33 @@ export const appRouter = router({
         const avgPrecision = totalPrecision / validQueries;
         const avgMrr = totalMrr / validQueries;
 
-        // Save the metrics
+        // Save individual query metrics for better tracking
+        for (const log of searchLogs) {
+          if (!log.query || !log.topResults) continue;
+          try {
+            const topResults = typeof log.topResults === 'string' ? JSON.parse(log.topResults) : log.topResults;
+            const searchResults: SearchResult[] = topResults.map((r: any, i: number) => ({
+              productId: r.productId,
+              position: i + 1,
+              finalScore: r.finalScore || 0,
+            }));
+            const judgments = generateAutoRelevanceJudgments(log.query, products);
+            const metrics = calculateAllMetrics(searchResults, judgments, 10);
+            
+            await saveEvaluationMetric({
+              metricType: "ndcg@10",
+              value: metrics.ndcg.toFixed(4),
+              notes: `SearchLogId: ${log.id}`,
+            });
+          } catch (e) {}
+        }
+
+        // Save the aggregate metrics
         await saveEvaluationMetric({
           metricType: "ndcg@10",
           value: avgNdcg.toFixed(4),
           queryCount: validQueries,
-          notes: `Calculated from ${validQueries} queries`,
+          notes: `Aggregate: Calculated from ${validQueries} queries`,
         });
         await saveEvaluationMetric({
           metricType: "recall@10",

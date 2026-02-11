@@ -1,5 +1,5 @@
-import { eq, desc, and, like, gte, lte, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { 
   InsertUser, users, 
   products, InsertProduct, Product,
@@ -532,4 +532,14 @@ export async function getEvaluationMetrics(limit = 50) {
     .from(evaluationMetrics)
     .orderBy(desc(evaluationMetrics.evaluatedAt))
     .limit(limit);
+}
+
+export async function getEvaluationMetricsBySearchLogId(searchLogId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return db.select()
+    .from(evaluationMetrics)
+    .where(eq(evaluationMetrics.notes, `SearchLogId: ${searchLogId}`))
+    .orderBy(desc(evaluationMetrics.evaluatedAt));
 }

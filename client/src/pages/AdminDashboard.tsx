@@ -721,6 +721,21 @@ function WeightsTab() {
   );
 }
 
+function IRMetricsBadge({ searchLogId }: { searchLogId: number }) {
+  const { data: metrics, isLoading } = trpc.admin.stats.bySearchLogId.useQuery({ searchLogId });
+
+  if (isLoading) return <div className="h-4 w-16 bg-muted animate-pulse rounded" />;
+  if (!metrics || metrics.length === 0) return <span className="text-xs text-muted-foreground">-</span>;
+
+  const ndcg = metrics.find(m => m.metricType === "ndcg@10")?.value;
+  
+  return (
+    <Badge variant="outline" className="font-mono text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+      nDCG: {ndcg || "N/A"}
+    </Badge>
+  );
+}
+
 function LogsTab() {
   const { data: searchLogs, isLoading } = trpc.search.logs.useQuery({ limit: 50 });
 
@@ -749,6 +764,7 @@ function LogsTab() {
                 <TableHead>Query</TableHead>
                 <TableHead>Results</TableHead>
                 <TableHead>Response Time</TableHead>
+                <TableHead>IR Metrics</TableHead>
                 <TableHead>Session</TableHead>
                 <TableHead>Time</TableHead>
               </TableRow>
@@ -764,6 +780,9 @@ function LogsTab() {
                     <Badge variant={log.responseTimeMs && log.responseTimeMs < 500 ? "default" : "secondary"}>
                       {log.responseTimeMs}ms
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <IRMetricsBadge searchLogId={log.id} />
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     {log.sessionId.slice(0, 8)}...
