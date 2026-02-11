@@ -43,6 +43,7 @@ import Header from "@/components/Header";
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const devLoginAttemptKey = "smartcart-admin-dev-login-attempted";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -56,14 +57,25 @@ export default function AdminDashboard() {
     );
   }
 
-  // In development, if not authenticated, redirect to dev-login
-  if (!isAuthenticated) {
-    window.location.href = "/api/auth/dev-login?redirect=/admin";
-    return null;
-  }
+  // In local development, attempt dev-login once to prevent infinite refresh loops.
+  if (!isAuthenticated || user?.role !== "admin") {
+    if (import.meta.env.DEV) {
+      const hasAttemptedDevLogin =
+        typeof window !== "undefined" &&
+        window.sessionStorage.getItem(devLoginAttemptKey) === "1";
 
-  // Double check admin role, but we'll ensure the dev-login grants it
-  if (user?.role !== "admin") {
+      if (!hasAttemptedDevLogin) {
+        window.sessionStorage.setItem(devLoginAttemptKey, "1");
+        window.location.href = "/api/auth/dev-login?redirect=/admin";
+        return null;
+      }
+    }
+
+    if (!isAuthenticated) {
+      window.location.href = "/api/auth/dev-login?redirect=/admin";
+      return null;
+    }
+
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -74,7 +86,10 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground mb-4">
               Your account ({user?.email}) does not have admin privileges.
             </p>
-            <Button onClick={() => window.location.href = "/api/auth/dev-login?redirect=/admin"}>
+            <Button onClick={() => {
+              window.sessionStorage.removeItem(devLoginAttemptKey);
+              window.location.href = "/api/auth/dev-login?redirect=/admin";
+            }}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Login as Admin
             </Button>
@@ -82,6 +97,10 @@ export default function AdminDashboard() {
         </div>
       </div>
     );
+  }
+
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(devLoginAttemptKey);
   }
 
   return (

@@ -56,6 +56,13 @@ async function startServer() {
         lastSignedIn: new Date(),
       });
 
+      const user = await db.getUserByOpenId(openId);
+      if (!user) {
+        return res.status(503).json({
+          error: "dev-login requires a running database (start smartcart-mysql)",
+        });
+      }
+
       const sessionToken = await sdk.createSessionToken(openId, {
         name,
         expiresInMs: ONE_YEAR_MS,
@@ -86,6 +93,13 @@ async function startServer() {
         role: "admin",
         lastSignedIn: new Date(),
       });
+
+      const user = await db.getUserByOpenId(openId);
+      if (!user) {
+        return res.status(503).json({
+          error: "dev-login requires a running database (start smartcart-mysql)",
+        });
+      }
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name,
