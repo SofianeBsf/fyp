@@ -134,6 +134,10 @@ export default function ProductDetail() {
     );
   }
 
+
+  const productCompat = product as typeof product & { image_url?: string | null; image?: string | null };
+  const productImage = productCompat.imageUrl || productCompat.image_url || productCompat.image || null;
+
   const availability = getAvailabilityInfo(product.availability);
   const AvailabilityIcon = availability.icon;
 
@@ -167,9 +171,9 @@ export default function ProductDetail() {
         <div className="grid lg:grid-cols-2 gap-8 mb-12">
           {/* Product Image */}
           <div className="aspect-square bg-muted rounded-xl overflow-hidden">
-            {product.imageUrl ? (
+            {productImage ? (
               <img
-                src={product.imageUrl}
+                src={productImage}
                 alt={product.title}
                 className="w-full h-full object-cover"
               />
