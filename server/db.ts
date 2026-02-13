@@ -16,10 +16,110 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+
+let _legacyProductColumnsBackfilled = false;
+
+async function backfillLegacyProductColumns(db: ReturnType<typeof drizzle>) {
+  if (_legacyProductColumnsBackfilled) return;
+
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      -- Backfill legacy snake_case columns into canonical camelCase columns (if both exist)
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'image_url'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'imageUrl'
+      ) THEN
+        UPDATE products
+        SET "imageUrl" = COALESCE("imageUrl", image_url)
+        WHERE image_url IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'original_price'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'originalPrice'
+      ) THEN
+        UPDATE products
+        SET "originalPrice" = COALESCE("originalPrice", original_price)
+        WHERE original_price IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'review_count'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'reviewCount'
+      ) THEN
+        UPDATE products
+        SET "reviewCount" = COALESCE("reviewCount", review_count)
+        WHERE review_count IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'stock_quantity'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'stockQuantity'
+      ) THEN
+        UPDATE products
+        SET "stockQuantity" = COALESCE("stockQuantity", stock_quantity)
+        WHERE stock_quantity IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'is_featured'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'isFeatured'
+      ) THEN
+        UPDATE products
+        SET "isFeatured" = COALESCE("isFeatured", is_featured)
+        WHERE is_featured IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'created_at'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'createdAt'
+      ) THEN
+        UPDATE products
+        SET "createdAt" = COALESCE("createdAt", created_at)
+        WHERE created_at IS NOT NULL;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'updated_at'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'updatedAt'
+      ) THEN
+        UPDATE products
+        SET "updatedAt" = COALESCE("updatedAt", updated_at)
+        WHERE updated_at IS NOT NULL;
+      END IF;
+    END $$;
+  `);
+
+  _legacyProductColumnsBackfilled = true;
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
+      await backfillLegacyProductColumns(_db);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -155,11 +255,13 @@ export async function searchProductsByKeyword(keyword: string, limit = 20) {
   const db = await getDb();
   if (!db) return [];
   
-  const searchTerm = `%${keyword}%`;
+  const searchTerm = `%${keyword.trim()}%`;
   return db.select()
     .from(products)
     .where(
-      sql`${products.title} LIKE ${searchTerm} OR ${products.description} LIKE ${searchTerm} OR ${products.category} LIKE ${searchTerm}`
+      sql`${products.title} ILIKE ${searchTerm}
+        OR coalesce(${products.description}, '') ILIKE ${searchTerm}
+        OR coalesce(${products.category}, '') ILIKE ${searchTerm}`
     )
     .limit(limit);
 }
@@ -178,12 +280,22 @@ export async function getProductsByCategory(category: string, limit = 50) {
 export async function getFeaturedProducts(limit = 10) {
   const db = await getDb();
   if (!db) return [];
-  
-  return db.select()
+
+  const featured = await db.select()
     .from(products)
     .where(eq(products.isFeatured, true))
     .limit(limit)
     .orderBy(desc(products.rating));
+
+  if (featured.length > 0) {
+    return featured;
+  }
+
+  // Migration-safe fallback: if no featured flag data exists, return top-rated products instead.
+  return db.select()
+    .from(products)
+    .limit(limit)
+    .orderBy(desc(products.rating), desc(products.createdAt));
 }
 
 export async function updateProduct(id: number, updates: Partial<InsertProduct>) {
@@ -263,7 +375,7 @@ export async function getProductsWithEmbeddings() {
     embedding: productEmbeddings.embedding,
   })
   .from(products)
-  .innerJoin(productEmbeddings, eq(products.id, productEmbeddings.productId));
+  .leftJoin(productEmbeddings, eq(products.id, productEmbeddings.productId));
 }
 
 export async function getEmbeddingCount() {

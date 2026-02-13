@@ -89,7 +89,7 @@ const aiClient = axios.create({
  */
 export async function checkAIServiceHealth(): Promise<boolean> {
   try {
-    const response = await aiClient.get("/health");
+    const response = await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 1500 });
     return response.data.status === "healthy";
   } catch (error) {
     console.error("[AIService] Health check failed:", error);
