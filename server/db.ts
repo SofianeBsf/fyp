@@ -155,11 +155,13 @@ export async function searchProductsByKeyword(keyword: string, limit = 20) {
   const db = await getDb();
   if (!db) return [];
   
-  const searchTerm = `%${keyword}%`;
+  const searchTerm = `%${keyword.trim()}%`;
   return db.select()
     .from(products)
     .where(
-      sql`${products.title} LIKE ${searchTerm} OR ${products.description} LIKE ${searchTerm} OR ${products.category} LIKE ${searchTerm}`
+      sql`${products.title} ILIKE ${searchTerm}
+        OR coalesce(${products.description}, '') ILIKE ${searchTerm}
+        OR coalesce(${products.category}, '') ILIKE ${searchTerm}`
     )
     .limit(limit);
 }
