@@ -28,6 +28,8 @@ import {
   getRecentlyViewedProducts,
   getSearchLogs,
   getSearchLogsWithResults,
+  logSearch,
+  saveSearchExplanations,
   getEvaluationMetrics,
   getEvaluationMetricsBySearchLogId,
   getSearchLogById,
@@ -242,10 +244,8 @@ export const appRouter = router({
               const searchLogId = await logSearch({
                 query: input.query,
                 sessionId,
-                userId: ctx.user?.id || null,
                 resultsCount: transformedResults.length,
                 responseTimeMs: aiResult.response_time_ms,
-                aiServiceUsed: true,
               });
 
               // Save result explanations
@@ -261,7 +261,7 @@ export const appRouter = router({
                   recencyScore: r.scoreBreakdown.recencyScore.toString(),
                   finalScore: r.score.toString(),
                   explanation: r.explanation,
-                  matchedTerms: JSON.stringify(r.matchedTerms),
+                  matchedTerms: r.matchedTerms,
                 }));
                 await saveSearchExplanations(explanations);
               }
@@ -271,7 +271,6 @@ export const appRouter = router({
                 searchLogId,
                 responseTimeMs: aiResult.response_time_ms,
                 query: input.query,
-                aiServiceUsed: true,
               };
             }
             console.log("[Search] AI service returned 0 results, falling back to local search");

@@ -155,7 +155,8 @@ export async function semanticSearchViaAI(
     });
     return response.data;
   } catch (error) {
-    console.warn("[AIService] Error in semantic search, returning empty results for fallback:", error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn("[AIService] Error in semantic search, returning empty results for fallback:", errorMessage);
     // Return a structured empty response so the router can fall back gracefully
     return {
       results: [],

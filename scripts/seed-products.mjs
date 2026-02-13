@@ -3,8 +3,7 @@
  * Run with: node scripts/seed-products.mjs
  */
 
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { Client } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -350,16 +349,16 @@ const sampleProducts = [
 async function seedProducts() {
   console.log("Connecting to database...");
   
-  const connection = await mysql.createConnection(DATABASE_URL);
-  const db = drizzle(connection);
+  const client = new Client({ connectionString: DATABASE_URL });
+  await client.connect();
   
   console.log("Seeding products...");
   
   for (const product of sampleProducts) {
     try {
-      await connection.execute(
-        `INSERT INTO products (title, description, category, subcategory, imageUrl, price, originalPrice, currency, rating, reviewCount, availability, stockQuantity, brand, features, isFeatured, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      await client.query(
+        `INSERT INTO products ("title", "description", "category", "subcategory", "imageUrl", "price", "originalPrice", "currency", "rating", "reviewCount", "availability", "stockQuantity", "brand", "features", "isFeatured", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, NOW(), NOW())`,
         [
           product.title,
           product.description,
@@ -375,7 +374,7 @@ async function seedProducts() {
           product.stockQuantity,
           product.brand,
           JSON.stringify(product.features),
-          product.isFeatured ? 1 : 0,
+          product.isFeatured,
         ]
       );
       console.log(`✓ Added: ${product.title}`);
@@ -386,16 +385,17 @@ async function seedProducts() {
   
   // Create default ranking weights if not exists
   try {
-    await connection.execute(
-      `INSERT IGNORE INTO ranking_weights (name, alpha, beta, gamma, delta, epsilon, isActive, createdAt, updatedAt)
-       VALUES ('default', '0.500', '0.200', '0.150', '0.100', '0.050', 1, NOW(), NOW())`
+    await client.query(
+      `INSERT INTO ranking_weights ("name", "alpha", "beta", "gamma", "delta", "epsilon", "isActive", "createdAt", "updatedAt")
+       VALUES ('default', '0.500', '0.200', '0.150', '0.100', '0.050', TRUE, NOW(), NOW())
+       ON CONFLICT DO NOTHING`
     );
     console.log("✓ Created default ranking weights");
   } catch (error) {
     console.log("Ranking weights already exist");
   }
   
-  await connection.end();
+  await client.end();
   console.log("\nSeeding complete!");
 }
 

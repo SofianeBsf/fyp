@@ -20,6 +20,6 @@ I have completed the requested fixes to ensure the project is 100% functional an
 - **Upload Functionality**: The "Catalog" tab in the Admin Dashboard is now fully functional for uploading this CSV to populate your product database.
 
 ## How to Run
-1. Ensure Docker is running: `docker start smartcart-mysql smartcart-redis`
+1. Ensure Docker is running: `docker start smartcart-postgres smartcart-redis`
 2. Start the app: `npm run dev`
 3. Access Admin: `http://localhost:3000/admin`
