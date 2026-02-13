@@ -280,12 +280,22 @@ export async function getProductsByCategory(category: string, limit = 50) {
 export async function getFeaturedProducts(limit = 10) {
   const db = await getDb();
   if (!db) return [];
-  
-  return db.select()
+
+  const featured = await db.select()
     .from(products)
     .where(eq(products.isFeatured, true))
     .limit(limit)
     .orderBy(desc(products.rating));
+
+  if (featured.length > 0) {
+    return featured;
+  }
+
+  // Migration-safe fallback: if no featured flag data exists, return top-rated products instead.
+  return db.select()
+    .from(products)
+    .limit(limit)
+    .orderBy(desc(products.rating), desc(products.createdAt));
 }
 
 export async function updateProduct(id: number, updates: Partial<InsertProduct>) {
@@ -365,7 +375,7 @@ export async function getProductsWithEmbeddings() {
     embedding: productEmbeddings.embedding,
   })
   .from(products)
-  .innerJoin(productEmbeddings, eq(products.id, productEmbeddings.productId));
+  .leftJoin(productEmbeddings, eq(products.id, productEmbeddings.productId));
 }
 
 export async function getEmbeddingCount() {
