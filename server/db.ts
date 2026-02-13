@@ -1,5 +1,4 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { 
   InsertUser, users, 
@@ -16,13 +15,11 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
-let _pool: Pool | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _pool = new Pool({ connectionString: process.env.DATABASE_URL });
-      _db = drizzle({ client: _pool });
+      _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
