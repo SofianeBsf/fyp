@@ -1,4 +1,5 @@
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { 
   InsertUser, users, 
@@ -15,11 +16,13 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      _db = drizzle({ client: _pool });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -80,8 +83,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: { ...updateSet, updatedAt: new Date() },
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
@@ -106,8 +110,8 @@ export async function createProduct(product: InsertProduct) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(products).values(product);
-  return result[0].insertId;
+  const result = await db.insert(products).values(product).returning({ id: products.id });
+  return result[0]?.id;
 }
 
 export async function createProducts(productList: InsertProduct[]) {
@@ -213,7 +217,8 @@ export async function createEmbedding(embedding: InsertProductEmbedding) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  await db.insert(productEmbeddings).values(embedding).onDuplicateKeyUpdate({
+  await db.insert(productEmbeddings).values(embedding).onConflictDoUpdate({
+    target: productEmbeddings.productId,
     set: {
       embedding: embedding.embedding,
       textUsed: embedding.textUsed,
@@ -402,8 +407,8 @@ export async function logSearch(log: InsertSearchLog) {
   const db = await getDb();
   if (!db) return 0;
   
-  const result = await db.insert(searchLogs).values(log);
-  return result[0].insertId;
+  const result = await db.insert(searchLogs).values(log).returning({ id: searchLogs.id });
+  return result[0]?.id ?? 0;
 }
 
 export async function getSearchLogs(limit = 100) {
@@ -483,8 +488,8 @@ export async function createUploadJob(job: InsertCatalogUploadJob) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(catalogUploadJobs).values(job);
-  return result[0].insertId;
+  const result = await db.insert(catalogUploadJobs).values(job).returning({ id: catalogUploadJobs.id });
+  return result[0]?.id;
 }
 
 export async function updateUploadJob(id: number, updates: Partial<InsertCatalogUploadJob>) {

@@ -59,7 +59,7 @@ async function startServer() {
       const user = await db.getUserByOpenId(openId);
       if (!user) {
         return res.status(503).json({
-          error: "dev-login requires a running database (start smartcart-mysql)",
+          error: "dev-login requires a running database (start smartcart-postgres)",
         });
       }
 
@@ -97,7 +97,7 @@ async function startServer() {
       const user = await db.getUserByOpenId(openId);
       if (!user) {
         return res.status(503).json({
-          error: "dev-login requires a running database (start smartcart-mysql)",
+          error: "dev-login requires a running database (start smartcart-postgres)",
         });
       }
 
