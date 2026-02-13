@@ -9,6 +9,8 @@ interface Product {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  image_url?: string | null;
+  image?: string | null;
   price?: string | null;
   originalPrice?: string | null;
   currency?: string | null;
@@ -50,6 +52,9 @@ export default function ProductCard({
     return `${symbol}${parseFloat(price).toFixed(2)}`;
   };
 
+
+  const productImage = product.imageUrl || product.image_url || product.image || null;
+
   const getAvailabilityBadge = (availability: string | null | undefined) => {
     switch (availability) {
       case "in_stock":
@@ -68,9 +73,9 @@ export default function ProductCard({
       <Link href={`/product/${product.id}`} onClick={handleClick}>
         <Card className="product-card overflow-hidden cursor-pointer h-full">
           <div className="aspect-square bg-muted relative overflow-hidden">
-            {product.imageUrl ? (
+            {productImage ? (
               <img
-                src={product.imageUrl}
+                src={productImage}
                 alt={product.title}
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -98,9 +103,9 @@ export default function ProductCard({
     <Link href={`/product/${product.id}`} onClick={handleClick}>
       <Card className="product-card overflow-hidden cursor-pointer h-full flex flex-col">
         <div className="aspect-square bg-muted relative overflow-hidden">
-          {product.imageUrl ? (
+          {productImage ? (
             <img
-              src={product.imageUrl}
+              src={productImage}
               alt={product.title}
               className="w-full h-full object-cover transition-transform hover:scale-105"
               loading="lazy"
